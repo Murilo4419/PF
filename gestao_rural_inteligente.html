@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestão Rural Inteligente</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--navy:#173b32;--green:#28734d;--lime:#dff1e5;--bg:#f4f7f4;--ink:#1f3028;--muted:#64746b;--line:#dce6de;--white:#fff;--red:#b54747;--amber:#9a6b18}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:linear-gradient(120deg,#143b30,#286c49);color:white;padding:24px max(20px,calc((100% - 1200px)/2))}
+header h1{margin:0;font-size:clamp(23px,3vw,32px)}header p{margin:6px 0 0;color:#d8e9dd}
+main{max-width:1200px;margin:22px auto;padding:0 16px}.tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+.tabs button,.btn{border:1px solid var(--line);background:white;color:var(--ink);border-radius:9px;padding:10px 13px;cursor:pointer;font-weight:600}
+.tabs button.active,.btn.primary{background:var(--green);border-color:var(--green);color:white}
+.panel{display:none}.panel.active{display:block}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+.card{background:white;border:1px solid var(--line);border-radius:13px;padding:16px;margin-bottom:14px;box-shadow:0 2px 8px #1c39200a}
+.kpi small{color:var(--muted);display:block}.kpi strong{font-size:25px;display:block;margin:5px 0}.kpi em{font-style:normal;color:var(--muted);font-size:12px}
+h2{font-size:20px;margin:0 0 13px}h3{font-size:16px;margin:0 0 10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.field{display:flex;flex-direction:column;gap:5px;flex:1;min-width:150px}
+label{font-size:12px;font-weight:700;color:#52635a}input,select,textarea{width:100%;padding:10px;border:1px solid #cbd8ce;border-radius:8px;background:#fff;color:var(--ink);font:inherit}
+textarea{min-height:76px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);background:#f7faf7}
+.note{padding:11px 13px;background:#f0f7f1;border-left:3px solid var(--green);border-radius:7px;color:#395244;font-size:13px}
+.warn{background:#fff8e8;border-left-color:#c38a2b}.danger{color:var(--red)}.muted{color:var(--muted)}.chartbox{height:310px;position:relative}
+.badge{display:inline-block;padding:3px 8px;border-radius:20px;background:#edf4ee;font-size:11px;color:#286344}
+footer{max-width:1200px;margin:20px auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
+@media(max-width:850px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.grid{grid-template-columns:1fr}.field{min-width:100%}.tabs button{flex:1}}
+</style></head>
+<body>
+<header><h1>Gestão Rural Inteligente</h1><p>Painel de produção, clima, custos, comercialização e projeção de safras</p></header>
+<main>
+<div class="tabs">
+<button class="active" data-tab="painel">Visão geral</button><button data-tab="registros">Registros agrícolas</button><button data-tab="clima">Clima e manejo</button><button data-tab="custos">Custos e vendas</button><button data-tab="projecao">Projeções</button><button data-tab="dados">Dados e integrações</button>
+</div>
+<section id="painel" class="panel active">
+<div class="grid">
+<div class="card kpi"><small>Área registrada</small><strong id="kArea">0 ha</strong><em>Soma das áreas dos registros</em></div>
+<div class="card kpi"><small>Produção registrada</small><strong id="kProd">0 kg</strong><em>Produção informada</em></div>
+<div class="card kpi"><small>Produtividade média</small><strong id="kRend">—</strong><em>Produção ÷ área</em></div>
+<div class="card kpi"><small>Resultado financeiro</small><strong id="kResultado">R$ 0</strong><em>Receitas menos custos cadastrados</em></div>
+</div>
+<div class="card"><h2>Produção por cultura</h2><div class="chartbox"><canvas id="chartCulturas"></canvas></div></div>
+<div class="card"><h2>Últimos registros</h2><div class="tablewrap"><table><thead><tr><th>Período</th><th>Cultura</th><th>Área</th><th>Produção</th><th>Produtividade</th></tr></thead><tbody id="recentes"></tbody></table></div></div>
+<div class="note">Os indicadores refletem somente os registros cadastrados ou importados. Dados demonstrativos não são inseridos automaticamente.</div>
+</section>
+<section id="registros" class="panel">
+<div class="card"><h2>Novo registro de produção</h2>
+<div class="row">
+<div class="field"><label>Propriedade</label><input id="prop" placeholder="Ex.: Fazenda Boa Vista"></div>
+<div class="field"><label>Talhão</label><input id="talhao" placeholder="Ex.: Talhão 01"></div>
+<div class="field"><label>Cultura</label><select id="cultura"><option>Milho</option><option>Soja</option><option>Feijão</option><option>Algodão</option><option>Manga</option><option>Uva</option><option>Outra</option></select></div>
+<div class="field"><label>Safra / período</label><input id="periodo" placeholder="Ex.: 2026/2027"></div>
+</div><div class="row" style="margin-top:10px">
+<div class="field"><label>Área plantada (ha)</label><input id="area" type="number" min="0" step=".01"></div>
+<div class="field"><label>Produção colhida (kg)</label><input id="producao" type="number" min="0" step=".01"></div>
+<div class="field"><label>Perdas estimadas (kg)</label><input id="perdas" type="number" min="0" step=".01" value="0"></div>
+<div class="field"><label>Data de referência</label><input id="dataReg" type="date"></div>
+</div><div class="row" style="margin-top:10px"><div class="field"><label>Origem do dado</label><select id="origem"><option>Registro manual</option><option>Planilha CSV</option><option>PDF transcrito</option><option>Sistema de gestão</option></select></div><div class="field"><label>Observações</label><input id="obs" placeholder="Irrigação, variedade, ocorrência..."></div></div>
+<div class="actions"><button class="btn primary" onclick="addRegistro()">Salvar registro</button><button class="btn" onclick="limparRegistro()">Limpar</button></div></div>
+<div class="card"><h2>Base de produção</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Propriedade / talhão</th><th>Cultura</th><th>Safra</th><th>Área (ha)</th><th>Produção (kg)</th><th>kg/ha</th><th>Origem</th><th></th></tr></thead><tbody id="tReg"></tbody></table></div></div>
+</section>
+<section id="clima" class="panel">
+<div class="card"><h2>Registro climático e hídrico</h2><div class="row">
+<div class="field"><label>Data</label><input id="cData" type="date"></div><div class="field"><label>Talhão / local</label><input id="cLocal" placeholder="Talhão 01"></div><div class="field"><label>Chuva (mm)</label><input id="chuva" type="number" min="0" step=".1"></div><div class="field"><label>Temperatura média (°C)</label><input id="temp" type="number" step=".1"></div><div class="field"><label>Irrigação aplicada (mm)</label><input id="irrig" type="number" min="0" step=".1"></div>
+</div><div class="actions"><button class="btn primary" onclick="addClima()">Salvar clima</button></div></div>
+<div class="card"><h2>Histórico climático</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Local</th><th>Chuva (mm)</th><th>Temp. média</th><th>Irrigação (mm)</th><th></th></tr></thead><tbody id="tClima"></tbody></table></div></div>
+<div class="note warn">A chuva acumulada isoladamente não determina a necessidade de irrigação. Para recomendações agronômicas são necessários cultura, fase fenológica, solo, evapotranspiração, eficiência do sistema e dados locais confiáveis.</div>
+</section>
+<section id="custos" class="panel">
+<div class="card"><h2>Lançamento financeiro</h2><div class="row">
+<div class="field"><label>Data</label><input id="fData" type="date"></div><div class="field"><label>Tipo</label><select id="fTipo"><option value="custo">Custo</option><option value="receita">Receita</option></select></div><div class="field"><label>Categoria</label><select id="fCat"><option>Insumos</option><option>Fertilizantes</option><option>Defensivos</option><option>Sementes</option><option>Mão de obra</option><option>Máquinas / combustível</option><option>Irrigação / energia</option><option>Frete</option><option>Venda da produção</option><option>Outros</option></select></div><div class="field"><label>Valor (R$)</label><input id="fValor" type="number" min="0" step=".01"></div><div class="field"><label>Cultura / safra</label><input id="fSafra" placeholder="Ex.: Milho 2026/27"></div>
+</div><div class="actions"><button class="btn primary" onclick="addFin()">Salvar lançamento</button></div></div>
+<div class="grid"><div class="card kpi"><small>Total de custos</small><strong id="totalCustos">R$ 0</strong></div><div class="card kpi"><small>Total de receitas</small><strong id="totalReceitas">R$ 0</strong></div><div class="card kpi"><small>Saldo</small><strong id="saldoFin">R$ 0</strong></div><div class="card kpi"><small>Registros financeiros</small><strong id="nFin">0</strong></div></div>
+<div class="card"><h2>Lançamentos</h2><div class="tablewrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Valor</th><th>Cultura / safra</th><th></th></tr></thead><tbody id="tFin"></tbody></table></div></div>
+</section>
+<section id="projecao" class="panel">
+<div class="card"><h2>Simulador de safra</h2><p class="muted">Informe premissas para estimar produção, receita, custos e resultado. O modelo é determinístico e não substitui avaliação agronômica.</p>
+<div class="row">
+<div class="field"><label>Cultura</label><select id="pCultura"><option>Milho</option><option>Soja</option><option>Feijão</option><option>Algodão</option><option>Manga</option><option>Uva</option></select></div>
+<div class="field"><label>Área prevista (ha)</label><input id="pArea" type="number" min="0" value="10"></div>
+<div class="field"><label>Produtividade-base (kg/ha)</label><input id="pRend" type="number" min="0" value="5000"></div>
+<div class="field"><label>Preço esperado (R$/kg)</label><input id="pPreco" type="number" min="0" step=".01" value="1.2"></div>
+<div class="field"><label>Custo estimado (R$/ha)</label><input id="pCusto" type="number" min="0" step=".01" value="3500"></div>
+</div><h3 style="margin-top:15px">Premissas dos cenários</h3><div class="row">
+<div class="field"><label>Pessimista: variação produtividade (%)</label><input id="pess" type="number" value="-20" step="1"></div>
+<div class="field"><label>Realista: variação produtividade (%)</label><input id="real" type="number" value="0" step="1"></div>
+<div class="field"><label>Otimista: variação produtividade (%)</label><input id="otim" type="number" value="15" step="1"></div>
+<div class="field"><label>Variação de preço comum (%)</label><input id="precoVar" type="number" value="0" step="1"></div>
+<div class="field"><label>Variação de custo comum (%)</label><input id="custoVar" type="number" value="0" step="1"></div>
+</div><div class="actions"><button class="btn primary" onclick="calcular()">Calcular cenários</button></div></div>
+<div class="grid" id="cardsProj"></div>
+<div class="card"><h2>Comparação de resultado por cenário</h2><div class="chartbox"><canvas id="chartProj"></canvas></div></div>
+<div class="card"><h2>Memória de cálculo</h2><div class="tablewrap"><table><thead><tr><th>Cenário</th><th>Produção (kg)</th><th>Receita bruta</th><th>Custo total</th><th>Resultado estimado</th><th>Produtividade</th></tr></thead><tbody id="tProj"></tbody></table></div></div>
+<div class="note warn">As variações climáticas não são aplicadas automaticamente. Para evitar falsa precisão, o usuário informa a variação esperada de produtividade com base em dados agronômicos, histórico e orientação técnica.</div>
+</section>
+<section id="dados" class="panel">
+<div class="card"><h2>Importar e exportar dados</h2><p class="muted">Importe arquivos CSV com cabeçalhos. O arquivo JSON exportado contém todos os registros e pode ser usado como cópia de segurança.</p>
+<div class="row"><div class="field"><label>Importar registros agrícolas (CSV)</label><input id="csvFile" type="file" accept=".csv,text/csv"></div><div class="field"><label>Restaurar backup (JSON)</label><input id="jsonFile" type="file" accept=".json,application/json"></div></div>
+<div class="actions"><button class="btn" onclick="exportCSV()">Exportar produção CSV</button><button class="btn" onclick="exportJSON()">Baixar backup completo JSON</button><button class="btn" onclick="document.getElementById('modelo').click()">Baixar modelo CSV</button><input hidden id="modelo" type="button" onclick="modeloCSV()"></div>
+</div>
+<div class="card"><h2>Conectores externos</h2><p>Esta versão funciona localmente no navegador. Para integrar sistemas, serviços meteorológicos ou bancos de dados, é necessário configurar um servidor/API, autenticação e regras de acesso.</p>
+<div class="row"><div class="field"><label>URL da API (opcional)</label><input id="apiUrl" placeholder="https://seu-servidor/api/registros"></div><div class="field"><label>Token (não recomendado salvar neste navegador)</label><input id="apiToken" type="password" placeholder="Token de acesso"></div></div>
+<div class="actions"><button class="btn" onclick="testarAPI()">Testar conexão GET</button></div><div id="apiMsg" class="muted" style="margin-top:8px" aria-live="polite"></div>
+</div>
+<div class="card"><h2>Privacidade e armazenamento</h2><p>Os registros ficam salvos no armazenamento local deste navegador. Eles não são enviados automaticamente a terceiros. Limpar os dados do navegador pode apagar os registros; faça backups periódicos.</p><button class="btn danger" onclick="limparTudo()">Apagar todos os dados locais</button></div>
+</section>
+</main><footer>Gestão Rural Inteligente • Ferramenta de apoio gerencial. Valide dados, unidades, premissas e recomendações com responsável técnico.</footer>
+<script>
+const KEY='gestaoRuralInteligente_v1';
+let db=carregar(), chCult=null,chProj=null,lastProj=[];
+function carregar(){try{return JSON.parse(localStorage.getItem(KEY))||{registros:[],clima:[],fin:[]}}catch(e){return{registros:[],clima:[],fin:[]}}}
+function salvar(){localStorage.setItem(KEY,JSON.stringify(db));renderAll()}
+function brl(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:2})}
+function num(v){return Number(v||0)}
+function fmt(v,d=1){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:d})}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+document.querySelectorAll('.tabs button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.tabs button,.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.getElementById(b.dataset.tab).classList.add('active');if(b.dataset.tab==='painel')renderPainel()}));
+function addRegistro(){let r={id:crypto.randomUUID(),propriedade:document.getElementById('prop').value.trim(),talhao:document.getElementById('talhao').value.trim(),cultura:document.getElementById('cultura').value,periodo:document.getElementById('periodo').value.trim(),area:num(document.getElementById('area').value),producao:num(document.getElementById('producao').value),perdas:num(document.getElementById('perdas').value),data:document.getElementById('dataReg').value,origem:document.getElementById('origem').value,obs:document.getElementById('obs').value.trim()};
+if(!r.data||r.area<=0||r.producao<0||r.perdas<0){alert('Informe data, área maior que zero e valores válidos de produção/perdas.');return}db.registros.push(r);salvar();limparRegistro()}
+function limparRegistro(){['prop','talhao','periodo','area','producao','perdas','dataReg','obs'].forEach(x=>document.getElementById(x).value='')}
+function del(tipo,id){if(!confirm('Excluir este registro?'))return;db[tipo]=db[tipo].filter(x=>x.id!==id);salvar()}
+function addClima(){let r={id:crypto.randomUUID(),data:cData.value,local:cLocal.value,chuva:num(chuva.value),temp:temp.value===''?null:num(temp.value),irrig:num(irrig.value)};if(!r.data||r.chuva<0||r.irrig<0){alert('Informe data e valores válidos.');return}db.clima.push(r);salvar();['cData','cLocal','chuva','temp','irrig'].forEach(x=>document.getElementById(x).value='')}
+function addFin(){let r={id:crypto.randomUUID(),data:fData.value,tipo:fTipo.value,categoria:fCat.value,valor:num(fValor.value),safra:fSafra.value};if(!r.data||r.valor<=0){alert('Informe data e valor maior que zero.');return}db.fin.push(r);salvar();['fData','fValor','fSafra'].forEach(x=>document.getElementById(x).value='')}
+function renderAll(){renderPainel();renderRegs();renderClima();renderFin()}
+function renderRegs(){tReg.innerHTML=db.registros.map(r=>`<tr><td>${esc(r.data)}</td><td>${esc(r.propriedade)} / ${esc(r.talhao)}</td><td>${esc(r.cultura)}</td><td>${esc(r.periodo)}</td><td>${fmt(r.area,2)}</td><td>${fmt(r.producao,1)}</td><td>${fmt(r.producao/r.area,1)}</td><td>${esc(r.origem)}</td><td><button class="btn" onclick="del('registros','${r.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="9">Nenhum registro cadastrado.</td></tr>'}
+function renderPainel(){let area=db.registros.reduce((a,r)=>a+r.area,0),prod=db.registros.reduce((a,r)=>a+r.producao,0),cust=db.fin.filter(x=>x.tipo==='custo').reduce((a,x)=>a+x.valor,0),rec=db.fin.filter(x=>x.tipo==='receita').reduce((a,x)=>a+x.valor,0);
+kArea.textContent=fmt(area,2)+' ha';kProd.textContent=fmt(prod,0)+' kg';kRend.textContent=area?fmt(prod/area,1)+' kg/ha':'—';kResultado.textContent=brl(rec-cust);
+recentes.innerHTML=db.registros.slice(-6).reverse().map(r=>`<tr><td>${esc(r.data)}</td><td>${esc(r.cultura)}</td><td>${fmt(r.area,2)} ha</td><td>${fmt(r.producao,0)} kg</td><td>${fmt(r.producao/r.area,1)} kg/ha</td></tr>`).join('')||'<tr><td colspan="5">Cadastre registros para visualizar indicadores.</td></tr>';
+let map={};db.registros.forEach(r=>map[r.cultura]=(map[r.cultura]||0)+r.producao);if(chCult)chCult.destroy();if(document.getElementById('chartCulturas'))chCult=new Chart(chartCulturas,{type:'bar',data:{labels:Object.keys(map),datasets:[{label:'Produção (kg)',data:Object.values(map)}]},options:{responsive:true,maintainAspectRatio:false}});
+}
+function renderClima(){tClima.innerHTML=db.clima.map(r=>`<tr><td>${esc(r.data)}</td><td>${esc(r.local)}</td><td>${fmt(r.chuva)}</td><td>${r.temp===null?'—':fmt(r.temp)+' °C'}</td><td>${fmt(r.irrig)}</td><td><button class="btn" onclick="del('clima','${r.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="6">Nenhum registro climático.</td></tr>'}
+function renderFin(){let c=db.fin.filter(x=>x.tipo==='custo').reduce((a,x)=>a+x.valor,0),r=db.fin.filter(x=>x.tipo==='receita').reduce((a,x)=>a+x.valor,0);totalCustos.textContent=brl(c);totalReceitas.textContent=brl(r);saldoFin.textContent=brl(r-c);nFin.textContent=db.fin.length;tFin.innerHTML=db.fin.map(x=>`<tr><td>${esc(x.data)}</td><td>${x.tipo}</td><td>${esc(x.categoria)}</td><td>${brl(x.valor)}</td><td>${esc(x.safra)}</td><td><button class="btn" onclick="del('fin','${x.id}')">Excluir</button></td></tr>`).join('')||'<tr><td colspan="6">Nenhum lançamento.</td></tr>'}
+function calcular(){let a=num(pArea.value),y=num(pRend.value),p=num(pPreco.value)*(1+num(precoVar.value)/100),c=num(pCusto.value)*(1+num(custoVar.value)/100);if(a<=0||y<0||p<0||c<0){alert('Revise área, produtividade, preço e custo.');return}
+let cases=[['Pessimista',num(pess.value)],['Realista',num(real.value)],['Otimista',num(otim.value)]];lastProj=cases.map(([nome,v])=>{let rend=y*(1+v/100),prod=a*rend,rec=prod*p,custo=a*c;return{nome,rend,prod,rec,custo,resultado:rec-custo,margem:rec?100*(rec-custo)/rec:0}});
+cardsProj.innerHTML=lastProj.map((x,i)=>`<div class="card kpi"><small>${x.nome}</small><strong>${brl(x.resultado)}</strong><em>Resultado estimado • ${fmt(x.prod,0)} kg</em></div>`).join('');
+tProj.innerHTML=lastProj.map(x=>`<tr><td>${x.nome}</td><td>${fmt(x.prod,0)}</td><td>${brl(x.rec)}</td><td>${brl(x.custo)}</td><td>${brl(x.resultado)}</td><td>${fmt(x.rend,1)} kg/ha</td></tr>`).join('');
+if(chProj)chProj.destroy();chProj=new Chart(chartProj,{type:'bar',data:{labels:lastProj.map(x=>x.nome),datasets:[{label:'Receita',data:lastProj.map(x=>x.rec)},{label:'Custos',data:lastProj.map(x=>x.custo)},{label:'Resultado',data:lastProj.map(x=>x.resultado)}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{ticks:{callback:v=>'R$ '+Number(v).toLocaleString('pt-BR')}}}}})}
+function download(name,content,type){let b=new Blob([content],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
+function exportJSON(){download('backup_gestao_rural.json',JSON.stringify(db,null,2),'application/json')}
+function csvCell(v){return '"'+String(v??'').replace(/"/g,'""')+'"'}
+function exportCSV(){let h=['data','propriedade','talhao','cultura','periodo','area_ha','producao_kg','perdas_kg','origem','observacoes'];let rows=db.registros.map(r=>[r.data,r.propriedade,r.talhao,r.cultura,r.periodo,r.area,r.producao,r.perdas,r.origem,r.obs]);download('producao_agricola.csv',[h,...rows].map(r=>r.map(csvCell).join(';')).join('\n'),'text/csv;charset=utf-8')}
+function modeloCSV(){download('modelo_importacao_producao.csv','data;propriedade;talhao;cultura;periodo;area_ha;producao_kg;perdas_kg;origem;observacoes\n2026-06-01;Fazenda Exemplo;Talhao 01;Milho;2026/27;10;50000;1000;Planilha CSV;Exemplo demonstrativo\n','text/csv;charset=utf-8')}
+function parseCSVLine(line,sep){let out=[],cur='',q=false;for(let i=0;i<line.length;i++){let c=line[i];if(c==='"'&&line[i+1]==='"'&&q){cur+='"';i++}else if(c==='"')q=!q;else if(c===sep&&!q){out.push(cur);cur=''}else cur+=c}out.push(cur);return out}
+csvFile.addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;let txt=(await f.text()).replace(/^\uFEFF/,'');let lines=txt.split(/\r?\n/).filter(x=>x.trim());if(lines.length<2){alert('CSV sem linhas de dados.');return}let sep=lines[0].includes(';')?';':',';let heads=parseCSVLine(lines.shift(),sep).map(x=>x.trim().toLowerCase());let idx=k=>heads.indexOf(k);let required=['data','area_ha','producao_kg'];if(required.some(k=>idx(k)<0)){alert('Cabeçalhos obrigatórios: data, area_ha, producao_kg. Baixe o modelo CSV.');return}let add=[];for(let line of lines){let v=parseCSVLine(line,sep),get=k=>v[idx(k)]||'';let area=num(get('area_ha').replace(',','.')),prod=num(get('producao_kg').replace(',','.'));if(!get('data')||area<=0||prod<0)continue;add.push({id:crypto.randomUUID(),data:get('data'),propriedade:get('propriedade'),talhao:get('talhao'),cultura:get('cultura')||'Não informada',periodo:get('periodo'),area,producao:prod,perdas:num((get('perdas_kg')||'0').replace(',','.')),origem:get('origem')||'Planilha CSV',obs:get('observacoes')})}db.registros.push(...add);salvar();alert(add.length+' registro(s) importado(s). Linhas inválidas foram ignoradas.');e.target.value=''});
+jsonFile.addEventListener('change',async e=>{let f=e.target.files[0];if(!f)return;try{let x=JSON.parse(await f.text());if(!Array.isArray(x.registros)||!Array.isArray(x.clima)||!Array.isArray(x.fin))throw Error();if(!confirm('Restaurar backup substituirá os dados atuais. Continuar?'))return;db=x;salvar();alert('Backup restaurado.')}catch(err){alert('Arquivo JSON incompatível ou inválido.')}e.target.value=''});
+async function testarAPI(){let url=apiUrl.value.trim();if(!url){apiMsg.textContent='Informe uma URL de API.';return}apiMsg.textContent='Testando...';try{let r=await fetch(url,{headers:apiToken.value?{Authorization:'Bearer '+apiToken.value}:{}});apiMsg.textContent='Resposta HTTP '+r.status+'. '+(r.ok?'Conexão GET realizada.':'A API respondeu com erro.');}catch(e){apiMsg.textContent='Não foi possível conectar. Verifique URL, CORS, rede e autenticação.'}}
+function limparTudo(){if(!confirm('Esta ação apagará registros agrícolas, climáticos e financeiros deste navegador. Faça backup antes.'))return;db={registros:[],clima:[],fin:[]};salvar()}
+renderAll();
+</script></body></html>

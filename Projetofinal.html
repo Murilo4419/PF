@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Módulo de Projeção - Diagnóstico</title>
+  <!-- Importando biblioteca Chart.js para os gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primaria: #1e3a8a;
+      --secundaria: #2563eb;
+      --fundo: #f8fafc;
+      --card: #ffffff;
+      --texto: #1e293b;
+      --borda: #e2e8f0;
+      --otimista: #16a34a;
+      --realista: #2563eb;
+      --pessimista: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background-color: var(--fundo);
+      color: var(--texto);
+      padding: 2rem 1rem;
+    }
+
+    .secao-projecao {
+      max-width: 1100px;
+      margin: 0 auto;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+      padding: 2rem;
+      border: 1px solid var(--borda);
+    }
+
+    .cabecalho-modulo {
+      border-bottom: 2px solid var(--borda);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .cabecalho-modulo h2 {
+      color: var(--primaria);
+      font-size: 1.5rem;
+    }
+
+    .badge {
+      background: #dbeafe;
+      color: var(--primaria);
+      padding: 0.35rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    /* Painel de Controles (Clima + Mercado) */
+    .controles-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.2rem;
+      background: #f1f5f9;
+      padding: 1.2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+
+    .campo {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .campo label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .campo input, .campo select {
+      padding: 0.6rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    /* Cards de Resumo dos 3 Cenários */
+    .cards-cenarios {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .cenario-card {
+      padding: 1.2rem;
+      border-radius: 8px;
+      border-left: 5px solid;
+      background: #f8fafc;
+    }
+
+    .cenario-card.pessimista { border-color: var(--pessimista); }
+    .cenario-card.realista   { border-color: var(--realista); }
+    .cenario-card.otimista   { border-color: var(--otimista); }
+
+    .cenario-card span {
+      font-size: 0.85rem;
+      color: #64748b;
+      display: block;
+    }
+
+    .cenario-card strong {
+      font-size: 1.4rem;
+      display: block;
+      margin: 0.3rem 0;
+    }
+
+    .cenario-card small {
+      font-size: 0.8rem;
+      color: #475569;
+    }
+
+    /* Área do Gráfico */
+    .grafico-container {
+      position: relative;
+      height: 360px;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <section class="secao-projecao">
+    <div class="cabecalho-modulo">
+      <div>
+        <h2>Projeção de Cenários Futuros</h2>
+        <p style="color: #64748b; font-size: 0.95rem;">Estimativa baseada no histórico (PDFs), regime de chuvas (mm) e valores de mercado.</p>
+      </div>
+      <span class="badge">Responsável: Murilo</span>
+    </div>
+
+    <!-- Simulador de Variáveis (Clima + Mercado) -->
+    <div class="controles-grid">
+      <div class="campo">
+        <label for="taxaCrescimento">Tendência Histórica (% ao mês)</label>
+        <input type="number" id="taxaCrescimento" value="2.5" step="0.5" oninput="atualizarProjecao()">
+      </div>
+
+      <div class="campo">
+        <label for="fatorClima">Condição Climática (Neto/Gabriel)</label>
+        <select id="fatorClima" onchange="atualizarProjecao()">
+          <option value="1.00">Chuvas na Média (Neutro)</option>
+          <option value="1.08">Chuvas Ideais (+8% impacto)</option>
+          <option value="0.88">Estiagem / Excesso (-12% impacto)</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="fatorMercado">Tendência de Mercado (Pedro/Fran)</label>
+        <select id="fatorMercado" onchange="atualizarProjecao()">
+          <option value="1.00">Preços Estáveis (Neutro)</option>
+          <option value="1.06">Alta de Preços (+6% impacto)</option>
+          <option value="0.93">Queda de Preços (-7% impacto)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Resultados Projetados para o 6º Mês Futuro -->
+    <div class="cards-cenarios">
+      <div class="cenario-card pessimista">
+        <span>Cenário Pessimista (6 meses)</span>
+        <strong id="valPessimista">R$ 0,00</strong>
+        <small>Considera quebra climática e retração</small>
+      </div>
+
+      <div class="cenario-card realista">
+        <span>Cenário Realista / Base (6 meses)</span>
+        <strong id="valRealista">R$ 0,00</strong>
+        <small>Segue a tendência linear + fatores atuais</small>
+      </div>
+
+      <div class="cenario-card otimista">
+        <span>Cenário Otimista (6 meses)</span>
+        <strong id="valOtimista">R$ 0,00</strong>
+        <small>Clima favorável e valorização de mercado</small>
+      </div>
+    </div>
+
+    <!-- Gráfico de Linhas (Histórico + Leque de Projeção) -->
+    <div class="grafico-container">
+      <canvas id="graficoProjecao"></canvas>
+    </div>
+  </section>
+
+  <script>
+    // Dados Históricos simulados (extraídos dos PDFs - 6 meses anteriores)
+    const mesesHistorico = ['Mês 1', 'Mês 2', 'Mês 3', 'Mês 4', 'Mês 5', 'Mês 6'];
+    const valoresHistorico = [42000, 43500, 44100, 45800, 47000, 48500];
+
+    // Meses futuros para projeção
+    const mesesFuturos = ['Mês 7 (Prev)', 'Mês 8 (Prev)', 'Mês 9 (Prev)', 'Mês 10 (Prev)', 'Mês 11 (Prev)', 'Mês 12 (Prev)'];
+    const todosMeses = [...mesesHistorico, ...mesesFuturos];
+
+    let chartInstance = null;
+
+    function formatarBRL(valor) {
+      return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function atualizarProjecao() {
+      const taxaMensal = parseFloat(document.getElementById('taxaCrescimento').value || 0) / 100;
+      const fatorClima = parseFloat(document.getElementById('fatorClima').value);
+      const fatorMercado = parseFloat(document.getElementById('fatorMercado').value);
+
+      const ultimoValorReal = valoresHistorico[valoresHistorico.length - 1];
+
+      // Arrays preenchidos com null na parte histórica para o gráfico conectar a partir do Mês 6
+      const serieHistorica = [...valoresHistorico, null, null, null, null, null, null];
+      const serieRealista = [null, null, null, null, null, ultimoValorReal];
+      const serieOtimista = [null, null, null, null, null, ultimoValorReal];
+      const seriePessimista = [null, null, null, null, null, ultimoValorReal];
+
+      let acumuladoBase = ultimoValorReal;
+
+      for (let i = 1; i <= 6; i++) {
+        // Aplica crescimento linear/composto + impacto combinado de clima e mercado
+        acumuladoBase = acumuladoBase * (1 + taxaMensal);
+        const valorRealista = acumuladoBase * fatorClima * fatorMercado;
+        const valorOtimista = valorRealista * (1 + 0.02 * i);   // Abre +2% ao mês
+        const valorPessimista = valorRealista * (1 - 0.02 * i); // Cai -2% ao mês
+
+        serieRealista.push(Math.round(valorRealista));
+        serieOtimista.push(Math.round(valorOtimista));
+        seriePessimista.push(Math.round(valorPessimista));
+      }
+
+      // Atualiza os cards com o valor final (Mês 12)
+      document.getElementById('valPessimista').textContent = formatarBRL(seriePessimista[11]);
+      document.getElementById('valRealista').textContent = formatarBRL(serieRealista[11]);
+      document.getElementById('valOtimista').textContent = formatarBRL(serieOtimista[11]);
+
+      renderizarGrafico(serieHistorica, serieRealista, serieOtimista, seriePessimista);
+    }
+
+    function renderizarGrafico(historico, realista, otimista, pessimista) {
+      const ctx = document.getElementById('graficoProjecao').getContext('2d');
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: todosMeses,
+          datasets: [
+            {
+              label: 'Histórico Real (PDFs)',
+              data: historico,
+              borderColor: '#0f172a',
+              backgroundColor: '#0f172a',
+              borderWidth: 3,
+              tension: 0.2
+            },
+            {
+              label: 'Projeção Otimista',
+              data: otimista,
+              borderColor: '#16a34a',
+              borderDash: [5, 5],
+              borderWidth: 2,
+              tension: 0.2
+            },
+            {
+              label: 'Projeção Realista',
+              data: realista,
+              borderColor: '#2563eb',
+              borderWidth: 3,
+              tension: 0.2
+            },
+            {
+              label: 'Projeção Pessimista',
+              data: pessimista,
+              borderColor: '#dc2626',
+              borderDash: [5, 5],
+              borderWidth: 2,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (context.parsed.y !== null) {
+                    label += ': ' + formatarBRL(context.parsed.y);
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: function(value) {
+                  return 'R$ ' + value.toLocaleString('pt-BR');
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Inicializa ao carregar a página
+    atualizarProjecao();
+  </script>
+</body>
+</html>
